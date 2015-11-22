@@ -29,5 +29,5 @@ ES node has 3 role responsibilities as below. They're not exclusive roles. One i
 For Detials: Please check [Elasticsearch Node](https://www.elastic.co/guide/en/elasticsearch/reference/master/modules-node.html)
 
 Here's our ES Topo.
-![es-topo]({{ site.JB.IMAGE_PATH }}/es_practice/es_topo.png "ES Topology Diagram")
+![es-topo]({{ site.JB.IMAGE_PATH }}/es_topo.png "ES Topology Diagram")
 
