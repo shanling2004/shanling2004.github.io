@@ -31,7 +31,3 @@ For Detials: Please check [Elasticsearch Node](https://www.elastic.co/guide/en/e
 Here's our ES Topo.
 ![es-topo]({{ site.JB.IMAGE_PATH }}/es_practice/es_topo.png "ES Topology Diagram")
 
-
-### Block Quote
-
-> Angle brackets `>` are used for block quotes.  
