@@ -8,9 +8,8 @@ comments: true
 {% include JB/setup %}
 
 ## 个人简介
+Brian Ling，主攻Java 副攻 python，前端Web开发(grunt, nodejs,bower,angualrJS,Jquery,bootstrap) 之前4-5年从事云平台开发，涉及MongoDB， Cassandra, zookeeper, ELK(elasticsearch,logstash,Kibana), openstack Ceilometer, puppet, foreman. 
 
-臧萌，Coder，主攻Java，现在主要从事大数据平台的搭建。战线比较长，包括HDFS，Yarn，HBase，Shark，Spark，Ganglia等。
-
-Contact Me: [linkedin](https://www.linkedin.com/pub/meng-zang/38/a2/8a1) 
+Contact Me: [linkedin](http://www.linkedin.com/in/brianling1983) 
 
 
