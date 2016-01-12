@@ -12,7 +12,7 @@ I want to share some performance tuning experience for elasticsearch, also leads
 
 Below is our ELK version.
 
-    Elasticsearch version: 1.7.3 
+    Elasticsearch version: 1.5.3 
     Logstash version: 1.0.9
     Kibana version: 4.0.3
  Target OS Version: Ubuntu 14.04
