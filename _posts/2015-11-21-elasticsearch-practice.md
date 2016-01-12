@@ -38,7 +38,7 @@ Data node need large volume disk for index repository storage and enough memory 
 ![es-topo]({{ site.JB.IMAGE_PATH }}/es_topo.png "ES Topology Diagram")
 
 
-# Perf Tuning Tips
+# **Perf Tuning Tips**
 ## Avoid Swap Out Memory
 When setting `bootstrap.mlockall=true`, elasticsearch try to lock the process address space into RAM, preventing any Elasticsearch memory frombeing swapped out.
 > About bootstrap.mlockall option, Please check code for org.elasticsearch.bootstrap.Bootstrap
@@ -61,13 +61,14 @@ private void setup(boolean addShutdownHook, Tuple<Settings, Environment>  tuple)
 ```
 2015-05-24 17:44:49,247][WARN ][monitor.jvm              ][slc5b01c-6gjg-elasticsearch] [gc][old][75543][4255] duration [39.9s], collections[1]/[40.3s], total [39.9s]/[1.7d], memory [62.8gb]->[62.8gb]/[63.8gb], all_pools{[young] [768.5mb]->[768.7mb]/[1.4gb]}{[survivor] [0b]->[0b]/[191.3mb]}{[old][62.1gb]->[62.1gb]/[62.1gb]}[2015-05-24 17:45:24,257][WARN ][monitor.jvm] [slc5b01c-6gjg-elasticsearch] [gc][old][75545][4256] duration [32.5s], collections[1]/[32.9s], total [32.5s]/[1.7d], memory [62.8gb]->[62.8gb]/[63.8gb], all_pools{[young] [770.1mb]->[768.8mb]/[1.4gb]}{[survivor] [0b]->[0b]/[191.3mb]}{[old][62.1gb]->[62.1gb]/[62.1gb]}[2015-05-24 17:46:06,697][WARN ][monitor.jvm              ][slc5b01c-6gjg-elasticsearch] [gc][old][75547][4257] duration [39.9s], collections[1]/[40.3s], total [39.9s]/[1.7d], memory [62.8gb]->[62.8gb]/[63.8gb], all_pools{[young] [770.4mb]->[768.9mb]/[1.4gb]}{[survivor] [0b]->[0b]/[191.3mb]}{[old][62.1gb]->[62.1gb]/[62.1gb]}[2015-05-24 17:46:49,276][WARN ][monitor.jvm              ][slc5b01c-6gjg-elasticsearch] [gc][old][75549][4258] duration [40s], collections[1]/[40.4s], total [40s]/[1.7d], memory [62.8gb]->[62.8gb]/[63.8gb], all_pools{[young] [784.6mb]->[769mb]/[1.4gb]}{[survivor] [0b]->[0b]/[191.3mb]}{[old][62.1gb]->[62.1gb]/[62.1gb]}[2015-05-24 17:47:28,451][WARN ][monitor.jvm              ][slc5b01c-6gjg-elasticsearch] [gc][old][75550][4259] duration [38.8s], collections[1]/[39.1s], total [38.8s]/[1.7d], memory [62.8gb]->[62.8gb]/[63.8gb], all_pools{[young] [769mb]->[769.1mb]/[1.4gb]}{[survivor] [0b]->[0b]/[191.3mb]}{[old][62.1gb]->[62.1gb]/[62.1gb]}[2015-05-24 17:48:08,778][WARN ][monitor.jvm              ][slc5b01c-6gjg-elasticsearch] [gc][old][75551][4260] duration [39.9s], collections[1]/[40.3s], total [39.9s]/[1.7d], memory [62.8gb]->[62.8gb]/[63.8gb], all_pools{[young] [769.1mb]->[769.2mb]/[1.4gb]}{[survivor] [0b]->[0b]/[191.3mb]}{[old][62.1gb]->[62.1gb]/[62.1gb]}[2015-05-24 17:48:19,869][WARN ][common.jna               ] Unable to lock JVM memory(ENOMEM). This can result in part of the JVM being swapped out. IncreaseRLIMIT_MEMLOCK (ulimit).[2015-05-24 17:48:41,028][WARN ][monitor.jvm              ][slc5b01c-6gjg-elasticsearch] [gc][young][4][3] duration [1.5s], collections[1]/[2.5s], total [1.5s]/[12.6s], memory [2.4gb]->[2.4gb]/[63.8gb], all_pools {[young][735.6mb]->[22.3mb]/[1.4gb]}{[survivor] [191.3mb]->[191.3mb]/[191.3mb]}{[old][1.5gb]->[2.2gb]/[62.1gb]}[2015-05-24 17:49:20,911][WARN ][monitor.jvm              ][slc5b01c-6gjg-elasticsearch] [gc][young][42][4] duration [2.7s], collections[1]/[2.8s], total [2.7s]/[15.3s], memory [3.8gb]->[3.6gb]/[63.8gb], all_pools {[young][1.4gb]->[20.8mb]/[1.4gb]}{[survivor] [191.3mb]->[191.3mb]/[191.3mb]}{[old][2.2gb]->[3.4gb]/[62.1gb]}
 ```
-* Solution
+* **Solution**
 
 > 1. in "/usr/lib/systemd/system/elasticsearch.service", let LimitMEMLOCK=infinity
 > 2. ulimit -l unlimited
 > 3. service elasticsearch-elasticsearch restart
 
-* Sanity Check 
+* **Sanity Check**
+
 You can check http://<root_uri>/_nodes/process, will see process.mlockall is true.
 
 ![mlockall check]({{ site.JB.IMAGE_PATH }}/mlockall.png "Process Url for mlockall check")
