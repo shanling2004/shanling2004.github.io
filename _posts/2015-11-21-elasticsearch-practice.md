@@ -1,17 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
-
-  - [](#)
-  - [tags: ["es","tuning"]](#tags-estuning)
-- [Introduction](#introduction)
-- [Concept Highlights](#concept-highlights)
-  - [Understand ES Toplogy](#understand-es-toplogy)
-- [Perf Tuning Tips](#perf-tuning-tips)
-  - [Avoid Swap Out Memory](#avoid-swap-out-memory)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ---
 layout: post
 title: "ElasticSearch Practice"
