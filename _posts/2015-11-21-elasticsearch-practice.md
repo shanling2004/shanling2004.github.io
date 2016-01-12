@@ -6,7 +6,7 @@ category:
 tags: ["es","tuning"]
 ---
 {% include JB/setup %}
-# Introduction
+# **Introduction**
 We have tried to setup ELK(elasticsearch-logstash-kibana) stack as parrt of our cloud monitor eco-system.
 I want to share some performance tuning experience for elasticsearch, also leads to under elasticsearch from code perspective.
 
@@ -17,8 +17,8 @@ Below is our ELK version.
     Kibana version: 4.0.3
  Target OS Version: Ubuntu 14.04
 
-#Concept Highlights
-## Understand ES Toplogy
+# **Concept Highlights**
+## *Understand ES Toplogy*
 ES node has 3 role responsibilities as below. They're not exclusive roles. One instance node can take one or more roles (E.g. both matser & data node).
 
 | Role        | settings           | Responsibility  |
@@ -39,7 +39,7 @@ Data node need large volume disk for index repository storage and enough memory 
 
 
 # **Perf Tuning Tips**
-## Avoid Swap Out Memory
+## *Avoid Swap Out Memory*
 When setting `bootstrap.mlockall=true`, elasticsearch try to lock the process address space into RAM, preventing any Elasticsearch memory frombeing swapped out.
 > About bootstrap.mlockall option, Please check code for org.elasticsearch.bootstrap.Bootstrap
 
