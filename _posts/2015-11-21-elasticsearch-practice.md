@@ -46,11 +46,13 @@ When setting `bootstrap.mlockall=true`, elasticsearch try to lock the process ad
 ```java
 
 private void setup(boolean addShutdownHook, Tuple<Settings, Environment>  tuple) throws Exception {
-        if (tuple.v1().getAsBoolean('bootstrap.mlockall', false)) {
+        if (tuple.v1().getAsBoolean("bootstrap.mlockall", false)) {
                     Natives.tryMlockall();
 }
 ```
+
 > org.elasticsearch.common.jna.CLibrary
+
 
 ```java
 ￼￼public static native int mlockall(int flags);
