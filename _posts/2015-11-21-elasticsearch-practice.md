@@ -111,8 +111,10 @@ Also, another solution to eliminate field data cache issue/constraints due to JV
 For faceting/sorting/grouping Lucene needs to iterate over every document to collect the field values. Traditionally, this is achieved by uninverting the term index. This performs very well actually, since the field values are already grouped (by nature of the index), but it is relatively slow to load and is maintained in memory. DocValues aim to alleviate both of these problems while keeping performance comparable.
 
 Enable doc value for given field as below
+
 ```
 PUT /c3_metrics/_mapping/vm_availability
+
 {
   "properties" : {
     "vpc": {
