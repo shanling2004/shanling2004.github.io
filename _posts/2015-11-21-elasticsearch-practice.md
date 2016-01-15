@@ -149,7 +149,7 @@ Elasticsearch's default mappings allow generic mapping definitions to be automat
 Below is the case which due to unsuitable dynamic field mapping.Phase A: Eachtime new index document comes in, when detect new field, then do analyzation & index in memory until reach to refresh duration, then flush to disk. Also, trigger update mapping to master coordinator node to merge mapping & flush cluster state to each node.
 Below is our template definition for dynamic mapping.
 
-| # of newly inserted fields        | # of index documents per day           | # of tokens for each field value separation  |# of field cardinality  |
+|  newly inserted fields number    | index documents count per day           |  token count for each field value separation  | field cardinality count  |
 | ------------- |:-------------:| -----:|-----:|
 | 100 | 681,035 | 3 (due to index type: analyzed)| 204,310,500      | 
 
