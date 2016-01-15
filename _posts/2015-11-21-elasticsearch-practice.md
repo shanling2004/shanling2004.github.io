@@ -6,7 +6,7 @@ category:
 tags: ["es","tuning"]
 ---
 {% include JB/setup %}
-# **Introduction**
+### **Introduction**
 We have tried to setup ELK(elasticsearch-logstash-kibana) stack as parrt of our cloud monitor eco-system.
 ## Use Case
 In our cloud eco-system, we will setup ELK to collect openstack control plane log and search for troubleshooting.
@@ -21,7 +21,7 @@ Below is our ELK version.
     Kibana version: 4.0.3
  Target OS Version: Ubuntu 14.04
 
-# **Concept Highlights**
+### **Concept Highlights**
 ## *Understand ES Toplogy*
 ES node has 3 role responsibilities as below. They're not exclusive roles. One instance node can take one or more roles (E.g. both matser & data node).
 
@@ -42,7 +42,7 @@ Data node need large volume disk for index repository storage and enough memory 
 ![es-topo]({{ site.JB.IMAGE_PATH }}/es_topo.png "ES Topology Diagram")
 
 
-# **Perf Tuning Tips**
+### **Perf Tuning Tips**
 ## *Avoid Swap Out Memory*
 When setting `bootstrap.mlockall=true`, elasticsearch try to lock the process address space into RAM, preventing any Elasticsearch memory frombeing swapped out.
 > About bootstrap.mlockall option, Please check code for org.elasticsearch.bootstrap.Bootstrap
@@ -79,7 +79,7 @@ You can check http://<root_uri>/_nodes/process, will see process.mlockall is tru
 
 ![mlockall check]({{ site.JB.IMAGE_PATH }}/mlockall.png "Process Url for mlockall check")
 
-# *Field Data Cache*
+## *Field Data Cache*
 * **Background**
 
 ES underneath lucen implementation (inverted index), it's like one concordances for whole book from key term mapping to whole content.
@@ -105,7 +105,7 @@ Caused by: org.elasticsearch.common.breaker.CircuitBreakingException: [FIELDDATA
  atorg.elasticsearch.index.fielddata.plain.AbstractIndexFieldData.load(AbstractIndexFieldData.java:80)        atorg.elasticsearch.search.facet.datehistogram.CountDateHistogramFacetExecutor$Collector.setNextReader(CountDateHistogramFacetExecutor.java:88)        atorg.elasticsearch.common.lucene.search.FilteredCollector.setNextReader(FilteredCollector.java:67)        atorg.apache.lucene.search.MultiCollector.setNextReader(MultiCollector.java:113)        at org.apache.lucene.search.IndexSearcher.search(IndexSearcher.java:612)        atorg.elasticsearch.search.internal.ContextIndexSearcher.search(ContextIndexSearcher.java:191)        at org.apache.lucene.search.IndexSearcher.search(IndexSearcher.java:309)        at org.elasticsearch.search.facet.FacetPhase.execute(FacetPhase.java:186)        ... 8 moreCaused by: org.elasticsearch.common.util.concurrent.UncheckedExecutionException:org.elasticsearch.common.breaker.CircuitBreakingException: [FIELDDATA] Data too large,data for [@timestamp] would be larger than limit of [41085134438/38.2gb]        at org.elasticsearch.common.cache.LocalCache$Segment.get(LocalCache.java:2203)        at org.elasticsearch.common.cache.LocalCache.get(LocalCache.java:3937)        atorg.elasticsearch.common.cache.LocalCache$LocalManualCache.get(LocalCache.java:4739)        atorg.elasticsearch.indices.fielddata.cache.IndicesFieldDataCache$IndexFieldCache.load(IndicesFieldDataCache.java:174)
 ```
 
-# *Doc_value*
+## *Doc_value*
 Also, another solution to eliminate field data cache issue/constraints due to JVM heap size limitation is to leverage lucene `doc_value`.
 
 For faceting/sorting/grouping Lucene needs to iterate over every document to collect the field values. Traditionally, this is achieved by uninverting the term index. This performs very well actually, since the field values are already grouped (by nature of the index), but it is relatively slow to load and is maintained in memory. DocValues aim to alleviate both of these problems while keeping performance comparable.
@@ -130,7 +130,7 @@ For DocValue performance & disk size consumption, please check [func-with-docval
 
 For initial Commit in Lucene, please check [Column-stride fields (aka per-document Payloads)](https://issues.apache.org/jira/browse/LUCENE-1231)
 
-# *Index Sharding Routing & Recovery Settings*
+## *Index Sharding Routing & Recovery Settings*
 When one data node is get out of ES cluster, ES cluster will trigger process to recover index shards from replica node.To minimize index recovery consumption time, we can enable concurrent mode as below.
 
 Our settings to enable recovery with concurrent mode & traffic throttling as below:
@@ -142,10 +142,10 @@ Our settings to enable recovery with concurrent mode & traffic throttling as bel
 
 Given the limited space available, for detailed settings meaning, please check [shard_allocation_settings](https://www.elastic.co/guide/en/elasticsearch/reference/2.1/shards-allocation.html#_shard_allocation_settings)
 
-# *To be dynamic or not?*
+## *To be dynamic or not?*
 Highlight this crucial topic as much as we can. It's the biggest issue we encounter during daily work.
 
-Elasticsearch's default mappings allow generic mapping definitions to be automatically applied to types that do not have mappings predefined.It's nice feature to allow us to create schema-less documents at will. And elasticsearch automatically detect target field type and do further analyzation & indexing.However, it will also involve much cpu & memory consumption for whole ES cluster.## Case Study for ES Cluster instability Issue due to Dynamic field Mapping
+Elasticsearch's default mappings allow generic mapping definitions to be automatically applied to types that do not have mappings predefined.It's nice feature to allow us to create schema-less documents at will. And elasticsearch automatically detect target field type and do further analyzation & indexing.However, it will also involve much cpu & memory consumption for whole ES cluster.# Case Study for ES Cluster instability Issue due to Dynamic field Mapping
 Below is the case which due to unsuitable dynamic field mapping.Phase A: Eachtime new index document comes in, when detect new field, then do analyzation & index in memory until reach to refresh duration, then flush to disk. Also, trigger update mapping to master coordinator node to merge mapping & flush cluster state to each node.
 Below is our template definition for dynamic mapping.
 
