@@ -153,7 +153,7 @@ Below is the case which due to unsuitable dynamic field mapping.Phase A: Eachti
 | ------------- |:-------------:| -----:|-----:|
 | 100 | 681,035 | 3 (due to index type: analyzed)| 204,310,500      | 
 
-> **worst case analysis: assuming each index documents's filed value is fully different and each field value contains 3 special characters (",-,+, WHITE_SPACE) at average.**
+> Worst case analysis: assuming each index documents's filed value is fully different and each field value contains 3 special characters (",-,+, WHITE_SPACE) at average.
 
 Assume we enable dynamic mapping as below
 
