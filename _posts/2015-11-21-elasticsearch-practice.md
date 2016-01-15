@@ -146,17 +146,12 @@ Highlight this crucial topic as much as we can. It's the biggest issue we encoun
 Elasticsearch's default mappings allow generic mapping definitions to be automatically applied to types that do not have mappings predefined.It's nice feature to allow us to create schema-less documents at will. And elasticsearch automatically detect target field type and do further analyzation & indexing.However, it will also involve much cpu & memory consumption for whole ES cluster.## Case Study for ES Cluster instability Issue due to Dynamic field Mapping
 Below is the case which due to unsuitable dynamic field mapping.Phase A: Eachtime new index document comes in, when detect new field, then do analyzation & index in memory until reach to refresh duration, then flush to disk. Also, trigger update mapping to master coordinator node to merge mapping & flush cluster state to each node.
 Below is our template definition for dynamic mapping.
-**worst case analysis: assuming each index documents's filed value is fully different and each field value contains 3 special characters (",-,+, WHITE_SPACE) at average.**
-
-|  # of newly inserted fields      | # of index documents per day           |  # of tokens for each field value separation  |
-| number of cardinality |
-| ------------- |:-------------:| :-------------:| -----:|
-| Dedicated Master Node | node.master = true; node.data=false | Only participant to work as coordinator node & won't store index repo locally|
-| Dedicated Data Node      | 
 
 | # of newly inserted fields        | # of index documents per day           | # of tokens for each field value separation  |# of field cardinality  |
 | ------------- |:-------------:| -----:|-----:|
 | 100 | 681,035 | 3 (due to index type: analyzed)| 204,310,500      | 
+
+> **worst case analysis: assuming each index documents's filed value is fully different and each field value contains 3 special characters (",-,+, WHITE_SPACE) at average.**
 
 Assume we enable dynamic mapping as below, thne periodically push index documents in.
 ```
