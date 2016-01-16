@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "ElasticSearch Practice"
-description: "ElasticSearch Understanding & Tuning"
+description: "ElasticSearch Understanding & Performance Tuning & Operations"
 category: 
 tags: ["es","tuning"]
 ---
@@ -12,7 +12,7 @@ We have tried to setup ELK(elasticsearch-logstash-kibana) stack as parrt of our 
 In our cloud eco-system, we will setup ELK to collect openstack control plane log and search for troubleshooting.
 Also, we will preiodically send out VM availability metrics (with multiple fields [E.g. vpc, image name, VM_uuid, cos]) into ES and work as time-series major portal for KPI evaluating.
 
-We'd like to share some performance tuning experience for elasticsearch, also leads to under elasticsearch from code perspective.
+We'd like to share some performance tuning & operation experience for elasticsearch, also leads to under elasticsearch from code perspective.
 
 Below is our ELK version.
 
@@ -142,10 +142,10 @@ Our settings to enable recovery with concurrent mode & traffic throttling as bel
 
 Given the limited space available, for detailed settings meaning, please check [shard_allocation_settings](https://www.elastic.co/guide/en/elasticsearch/reference/2.1/shards-allocation.html#_shard_allocation_settings)
 
-## *To be dynamic or not?*
+### *To be dynamic or not?*
 Highlight this crucial topic as much as we can. It's the biggest issue we encounter during daily work.
 
-Elasticsearch's default mappings allow generic mapping definitions to be automatically applied to types that do not have mappings predefined.It's nice feature to allow us to create schema-less documents at will. And elasticsearch automatically detect target field type and do further analyzation & indexing.However, it will also involve much cpu & memory consumption for whole ES cluster.# Case Study for ES Cluster instability Issue due to Dynamic field Mapping
+Elasticsearch's default mappings allow generic mapping definitions to be automatically applied to types that do not have mappings predefined.It's nice feature to allow us to create schema-less documents at will. And elasticsearch automatically detect target field type and do further analyzation & indexing.However, it will also involve much cpu & memory consumption for whole ES cluster.## Case Study for ES Cluster instability Issue due to Dynamic field Mapping
 Below is the case which due to unsuitable dynamic field mapping.Phase A: Eachtime new index document comes in, when detect new field, then do analyzation & index in memory until reach to refresh duration, then flush to disk. Also, trigger update mapping to master coordinator node to merge mapping & flush cluster state to each node.
 Below is our template definition for dynamic mapping.
 
@@ -196,3 +196,41 @@ GET /vm_details/_mappingExpand{"vm_details":{"mappings":{"_default_":{"dynamic
 ```
 GET /_cat/shardsvm_details 2 p INITIALIZING 134292 340.3mb 10.120.107.7  slc5b01c-6ofi-elasticsearchvm_details 2 r UNASSIGNED 134292 350.3mb 10.120.104.90 slc5b01c-5cf9-elasticsearchvm_details 0 p INITIALIZING 134959   342mb 10.120.79.97  slc5b01c-4259-elasticsearchvm_details 0 r UNASSIGNED 134959 358.4mb 10.120.107.7  slc5b01c-6ofi-elasticsearchvm_details 3 p INITIALIZING 134710 358.2mb 10.120.79.97  slc5b01c-4259-elasticsearchvm_details 3 r UNASSIGNED 134710 339.4mb 10.120.107.7  slc5b01c-6ofi-elasticsearchvm_details 1 r INITIALIZING 134259 337.8mb 10.120.79.97  slc5b01c-4259-elasticsearchvm_details 1 p UNASSIGNED 134259 348.3mb 10.120.104.90 slc5b01c-5cf9-elasticsearchvm_details 4 r INITIALIZING 135060   339mb 10.120.79.97  slc5b01c-4259-elasticsearchvm_details 4 p UNASSIGNED 135060   354mb 10.120.104.90 slc5b01c-5cf9-elasticsearch
 ```
+
+# Conclusion & Suggestion for dynamic field mapping
+Dynamic field mapping occupy too much resources (CPU/memory) to build lucene index repo especially when emerge lots of unexpected fields. Also, thhe situation will continue to worsen when enabling with analyzed index which will spawn more tokens/terms.
+
+Even for the worst case, the above time-consuming index process trigger long GC(pause) time which force data nodes failed to finish heartbeat communication within acceptable intervals. Then it leads master node regards given data node is leave the whole cluster and trigger index recovery process. For our case, we're fully familiar with expected fields subset which are used for search/aggregation/primary keys. So we can explicitly disable dynamic field mapping and list all critical field mappings in ES template.
+
+```
+GET /_template/vm_detailsmappings: { _default_: {  dynamic: false,  date_detection: false,  numeric_detection: false,  _ttl: {   enabled: true,   default: "60d"   },  properties: {   reason: {    index: "not_analyzed",    type: "string"   },   cos: {    index: "not_analyzed",    type: "string"}.... ...
+```
+
+## Graceful Decomm ES Data Node
+Assume the scenario we detected one ES data node whose has some hardware issue,
+we need to decomm it at once without any data loss as possible.
+
+We can tell ES cluster to exclude it from allocation as below command.This will cause Elasticsearch to allocate the shards on that node to the remaining nodes, without the state of the cluster changing to yellow or red (even if you have replication 0).
+Once all the shards have been reallocated you can shutdown the node and do whatever you need to do there. Once you're done, include the node for allocation and Elasticsearch will rebalance the shards again.
+
+```
+PUT _cluster/settings -d '{  "transient" :{      "cluster.routing.allocation.exclude._ip" : "XX.XX.XX.132"   }}';
+```
+
+Then we can confirm ES node topology as below.
+
+```
+GET _cat/nodes
+XXX-6svl.stratus.lvs.ebay.com XX.XX.XX.132 29 28 1.56 d -XXX-6svl-elasticsearch
+```
+
+Then we can confirm ES node topo & sharding alloaction as well. During shard slice auto-rebalance period, we can see the relocating status in shards.
+
+```
+GET _cat/shards
+logstash-2015.06.01  4 p RELOCATING 30518010 13.2gb XX.XX.XX.132XXX-6svl-elasticsearch -> YY.YY.YY.169 YYY-6f2b-elasticsearch
+```
+
+Also, [bigdesk plugin](https://github.com/lukas-vlcek/bigdesk) is useful visualization tool to demonstrate each shards distribution within whole ES node cluster as below.
+
+![es-shard-distribution]({{ site.JB.IMAGE_PATH }}/es-shard-distribution.png "ES Shards Distribution Diagram")
