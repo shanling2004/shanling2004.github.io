@@ -234,3 +234,13 @@ logstash-2015.06.01  4 p RELOCATING 30518010 13.2gb XX.XX.XX.132XXX-6svl-elasti
 Also, [bigdesk plugin](https://github.com/lukas-vlcek/bigdesk) is useful visualization tool to demonstrate each shards distribution within whole ES node cluster as below.
 
 ![es-shard-distribution]({{ site.JB.IMAGE_PATH }}/es-shard-distribution.png "ES Shards Distribution Diagram")
+
+## TimeZone
+When we're using Kibana 4, one thing you won't skip is to set target timestamp field for one index repository. Hence, we need to define date format for target timestamp filed.
+
+We can check [mapping-date-format](https://www.elastic.co/guide/en/elasticsearch/reference/1.6/mapping-date-format.html) as guidance. 
+
+|  Date Format  | Timestamp Field Value           |  
+| ------------- |:-------------:| 
+| check_at: {type: "date", format: "yyyy-MM-dd'T'HH:mm:ssZ" } | check_at: "2015-05-30T17:35:06-0700"| 
+| @timestamp: {type: "date", format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'" } | timestamp: "2015-07-10T00:06:02.605Z"| 
