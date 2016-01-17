@@ -3,7 +3,7 @@ layout: post
 title: "ElasticSearch Practice"
 description: "ElasticSearch Understanding & Performance Tuning & Operations"
 category: 
-tags: ["elasticsearch","tuning","practice"]
+tags: ["elasticsearch"]
 ---
 {% include JB/setup %}
 ### **Introduction**
