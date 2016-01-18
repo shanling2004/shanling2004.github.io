@@ -2,7 +2,7 @@
 layout: post
 title: "ElasticSearch Practice"
 description: "ElasticSearch Understanding & Performance Tuning & Operations"
-category: 
+category: elasticsearch 
 tags: ["elasticsearch"]
 ---
 {% include JB/setup %}
