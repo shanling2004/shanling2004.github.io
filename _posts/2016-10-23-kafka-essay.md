@@ -30,7 +30,7 @@ High Performance和High Throughput是很多分布式系统都追求和标榜的�
 ### Topic Partition Number
 ### Producer & Consumer Settings
 #### Order Matters
-#### Idenponent Consumer Bahvior
+#### Idempotent Consumer Bahvior
 
 
 Kafka Seek API
