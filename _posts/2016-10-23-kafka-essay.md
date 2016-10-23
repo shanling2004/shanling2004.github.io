@@ -34,7 +34,7 @@ High Performance和High Throughput是很多分布式系统都追求和标榜的�
 
 
 Kafka Seek API
-##Kafak Event Structure
+##Kafka Event Structure
 ![Kafka Message Structure]({{ site.JB.IMAGE_PATH }}/kafka_message_format.png "Kafka Message Structure")
 
 | Message   Column      | Description           | Size  |
@@ -47,4 +47,4 @@ Kafka Seek API
 
 ## Index Structure
 ## Fair Topic Partition Assignment
-## Consumer Rebalance & Consumer Redesign
+## Consumer Rebalance & Consumer Redesign
