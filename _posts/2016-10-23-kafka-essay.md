@@ -5,7 +5,8 @@ description: "Summarize Apache Kafka Key Experience Items"
 category: apache-kafka 
 tags: ["apache-kafka"]
 ---
-{% include JB/setup %}
+{% include JB/setup %}**Draft**
+
 今年多少做了些Apache Kafka相关的项目，看了些源码和很多社区的分享( 主要是[linkedin] (https://engineering.linkedin.com/) 和 [confluent.io](http://www.confluent.io/blog/) ), 这里多少做个总结, 留给未来的自己回顾，朝花夕拾。
 
 **Note**: 本文大部分是基于Apache Kafka 0.8.2和0.9.0版本讨论的。
