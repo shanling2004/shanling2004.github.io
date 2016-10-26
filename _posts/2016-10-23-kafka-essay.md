@@ -45,7 +45,7 @@ Write-Ahead log flush主要还是想充分利用性能友好的磁盘顺序写�
 
 但是 有一点我不太明白的是为什么顺序读 SAS磁盘 ( 53.2M values/sec ) 会优于SSD ( 42.2M values/sec )。
 
-###SendFIle API’s Zero Copy
+###SendFile API’s Zero Copy
 ####Batch EveryWhere
 ### Async Process
 
