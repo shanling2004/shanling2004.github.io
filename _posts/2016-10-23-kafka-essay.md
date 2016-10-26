@@ -88,7 +88,9 @@ Kafka Seek API
 | Value Length |  表示Key的总长度  |    4 Byte |
 | Value Payload | Value本身的内容   |    V Byte |
 
+**源码参看**
 [Comment for Kafka Message Structure](https://github.com/apache/kafka/blob/0.9.0/core/src/main/scala/kafka/message/Message.scala#L70-L82)
+
 [Byte Buffer Writer to fulifill Kafka Message](https://github.com/apache/kafka/blob/0.9.0/core/src/main/scala/kafka/message/Message.scala#L100-L131)
 
 ## Index Structure
