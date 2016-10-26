@@ -36,6 +36,10 @@ High Performance和High Throughput是很多分布式系统都追求和标榜的�
 
 ![Kafka Page Cache Disk Flush]({{ site.JB.IMAGE_PATH }}/page_cache_flush.png "Kafka Page Cache Disk Flush")
 
+最后 我们看个实际例子来确认kafka基于Page Cache为中心的消息存储思想, 下图展示我们产品环境的内存开销，当前系统 没有额外高负载进程 除了Kafka broker，可以看到Kafka Broker最多也就占用了13GB，整个Page Cache占用了超过110GB的memory footprint. 
+
+![Kafka Broker Memory Consumption]({{ site.JB.IMAGE_PATH }}/memory_consumption.png "Kafka Broker Memory Consumption")
+
 ###WAL
 Write-Ahead log flush主要还是想充分利用性能友好的磁盘顺序写。为了最大化提升读写性能，Kafka 追加event 在[log segment](https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/log/LogSegment.scala#L97) 和 [index](https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/log/LogSegment.scala#L105) byte buffer中 定期flush到page cache，进而刷到磁盘。
 
@@ -46,8 +50,19 @@ Write-Ahead log flush主要还是想充分利用性能友好的磁盘顺序写�
 但是 有一点我不太明白的是为什么顺序读 SAS磁盘 ( 53.2M values/sec ) 会优于SSD ( 42.2M values/sec )。
 
 ###SendFile API’s Zero Copy
+大多数场景下，磁盘数据读取, 进而通过网络传输到远端的服务器上。
+
+整个过程中，Kernel从磁盘读取数据, 在推到用户态的程序内存中, 然后再从用户态反推回Kenerl态，在通过socket buffer网络传输出去。其中，第二第三步骤显得多余而低效. 既浪费了CPU时钟资源，内存资源，同时两次用户态和Kernel态的切换，是相对比较昂贵的**Trap**操作, 涉及到上下文的切换. 
+
+![Comparing Random and Sequential Access in DIsk and Memory]({{ site.JB.IMAGE_PATH }}/sendfile_2.gif "Comparing Random and Sequential Access in DIsk and Memory")
+
+这就催生了ZeroCopy需求的OS API 支持, 通过Kenerl态内部Read Buffer和Socket Buffer拷贝，就完成网络传输的数据准备，完全不依赖用户态的任何操作和开销。
+
+![Zero Copy]({{ site.JB.IMAGE_PATH }}/sendfile.gif "Zero Copy")
+
+Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/log/FileMessageSet.scala#L165)来调用底层操作系统的SendFile 函数 (例如， Linux的)，使得所有incoming log追加都是Zero Copy, 省时省力。
+
 ####Batch EveryWhere
-### Async Process
 
 这章节最后，我想说 有得必有失，在追求某方面极致的过程中 必定在其他方面有所缺失 或者照顾不周。
 
