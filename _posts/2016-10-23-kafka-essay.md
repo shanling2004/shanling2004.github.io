@@ -63,7 +63,8 @@ Write-Ahead log flush主要还是想充分利用性能友好的磁盘顺序写�
 Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/log/FileMessageSet.scala#L165)来调用底层操作系统的[SendFile函数](https://github.com/torvalds/linux/blob/master/fs/read_write.c#L1400-L1402), 使得所有incoming log追加都是Zero Copy, 省时省力。
 
 ####Batch EveryWhere
-无论是Producer batch flush还是Consumer batch consume和Broker本地log segment保存MessageSet, Kafka无时无处都体现batch events的概念。
+无论是Producer batch flush还是Consumer batch consume和Broker本地log segment保存MessageSet, Kafka无时无处都体现batch events的概念，批量地处理event inbound outbound和存储。这为之后throughput tuning提供了基础构架的支持。
+
 ![Kafka Message Set]({{ site.JB.IMAGE_PATH }}/batch_process.png "Kafka Message Set")
 
 
