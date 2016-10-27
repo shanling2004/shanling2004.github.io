@@ -52,7 +52,7 @@ Write-Ahead log flush主要还是想充分利用性能友好的磁盘顺序写�
 ###SendFile API’s Zero Copy
 大多数场景下，磁盘数据读取, 进而通过网络传输到远端的服务器上。
 
-整个过程中，Kernel从磁盘读取数据, 在推到用户态的程序内存中, 然后再从用户态反推回Kenerl态，在通过socket buffer网络传输出去。其中，第二第三步骤显得多余而低效. 既浪费了CPU时钟资源，内存资源，同时两次用户态和Kernel态的切换，是相对比较昂贵的**Trap**操作, 涉及到上下文的切换. 
+整个过程中，Kernel从磁盘读取数据, 在推到用户态的程序内存中, 然后再从用户态反推回Kenerl态，在通过socket buffer网络传输出去。其中，第二第三步骤显得多余而低效. 既浪费了CPU时钟资源，内存资源，同时两次用户态和Kernel态的切换，是相对比较昂贵的System Call **Trap Interrupt**操作, 涉及到上下文的切换. 
 
 ![Comparing Random and Sequential Access in DIsk and Memory]({{ site.JB.IMAGE_PATH }}/sendfile_2.gif "Comparing Random and Sequential Access in DIsk and Memory")
 
@@ -60,9 +60,12 @@ Write-Ahead log flush主要还是想充分利用性能友好的磁盘顺序写�
 
 ![Zero Copy]({{ site.JB.IMAGE_PATH }}/sendfile.gif "Zero Copy")
 
-Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/log/FileMessageSet.scala#L165)来调用底层操作系统的SendFile 函数 (例如， Linux的)，使得所有incoming log追加都是Zero Copy, 省时省力。
+Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/log/FileMessageSet.scala#L165)来调用底层操作系统的[SendFile函数](https://github.com/torvalds/linux/blob/master/fs/read_write.c#L1400-L1402)  (例如， Linux的)，使得所有incoming log追加都是Zero Copy, 省时省力。
 
 ####Batch EveryWhere
+无论是producer batch flush还是consumer batch consume和bbroker本地log segment保存MessageSet, Kafka无时无处都体现batch events的概念，
+
+![Kafka Message Set]({{ site.JB.IMAGE_PATH }}/messageset.png "Kafka Message Set")
 
 这章节最后，我想说 有得必有失，在追求某方面极致的过程中 必定在其他方面有所缺失 或者照顾不周。
 
