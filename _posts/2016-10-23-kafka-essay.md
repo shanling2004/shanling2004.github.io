@@ -89,6 +89,7 @@ send.buffer.bytes=1048576
 ack=1
 retries=3
 buffer.memory=104857600
+linger.ms=300
 /* when buffer is full, then new incoming message is blocked till the buffer get released */
 block.on.buffer.full=true	
 /* to save network bandwidth, each event is GZIP compressed which try to use more CPU cycle used for compression to save network bandwidth */
@@ -102,6 +103,7 @@ compression.type=snappy
 ```
 batch.size <= send.buffer.bytes <= net.core.wmem_max
 ```
+
 再不济，需要满足`batch.size <= N * send.buffer.bytes <= M * net.core.wmem_max`, 以满足数据对齐发送的效果, 珍惜每个TCP和socket发送的窗口。
 
 * 关于压缩策略，比较Snappy和Gzip优劣，一般场景下，从吞吐量和CPU资源消耗角度看，Snappy都优于Gzip，除非是特别敏感于传输数量大小，GZIP是更优秀的选择（因为GZIP压缩比更高），例如跨数据中心的传输。参看附录#5
