@@ -72,8 +72,48 @@ Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka
 
 ##性能调优
 ### OS Layer
+#### TCP kernel parameters optimization 
+```
+net.ipv4.tcp_fin_timeout = 30net.ipv4.tcp_keepalive_time = 360net.ipv4.tcp_sack = 1net.ipv4.tcp_dsack = 1net.ipv4.tcp_timestamps = 1net.ipv4.tcp_window_scaling = 1net.ipv4.tcp_tw_reuse = 1net.ipv4.tcp_tw_recycle = 1net.core.wmem_max = 8388608net.core.rmem_max = 8388608net.ipv4.tcp_rmem = 4096        87380   8388608net.ipv4.tcp_wmem = 4096        87380   8388608net.ipv4.ip_local_port_range = 1024 65000net.ipv4.tcp_max_tw_buckets = 5000net.core.netdev_max_backlog = 262144net.core.somaxconn = 262144
+```
+#### Page Cache
+#### FD Number
+
 ### Topic Partition Number
 ### Producer & Consumer Settings
+#### Prodcuer Settings
+```
+/** The producer will attempt to batch records together into fewer requests whenever multiple records are being sent **/
+batch.size=1048576
+send.buffer.bytes=1048576
+ack=1
+retries=3
+buffer.memory=104857600
+/* when buffer is full, then new incoming message is blocked till the buffer get released */
+block.on.buffer.full=true	
+/* to save network bandwidth, each event is GZIP compressed which try to use more CPU cycle used for compression to save network bandwidth */
+compression.type=snappy 
+```
+
+* 关于"batch.size"配置, 请参看[RecordAccumulator#append 方法](https://github.com/apache/kafka/blob/0.9.0/clients/src/main/java/org/apache/kafka/clients/producer/internals/RecordAccumulator.java#L178-L197)，简单来说Producer Record Accumulator预先分配一个MemoryRecords, 预分配off-heap byteBuffer, 大小受"batch.size" 控制, 所有新来的event都通过`public FutureRecordMetadata tryAppend(byte[] key, byte[] value, Callback callback)` API 来加入到Memory Record. 
+* 关于"send.buffer.bytes"配置，请参看[NetworkClient#initiateConnect 方法](https://github.com/apache/kafka/blob/0.9.0/clients/src/main/java/org/apache/kafka/clients/NetworkClient.java#L489-L492)，简单来说就是创建socket connection with 配置的sender buffer和receive buffer size.
+
+因此 最理想情况下 如果我们在一次socket 发送 进而单次TCP 数据发送就完成一个批次的Kafka event,效率是最高的, 所以需要满足以下的配置条件:
+```
+batch.size <= send.buffer.bytes <= net.core.wmem_max
+```
+再不济，需要满足`batch.size <= N * send.buffer.bytes <= M * net.core.wmem_max`, 以满足数据对齐发送的效果, 珍惜每个TCP和socket发送的窗口。
+
+* 关于压缩策略，比较Snappy和Gzip优劣，参看附录#5
+
+| Comparison Item      | Snappy           | Gzip  |
+| ------------- |:-------------:| :---------------:|
+| Compression Ratio | 2:1    |    2。8:1 |
+| Throughput Ratio | 2.5X   |    1X |
+| CPU Cycle Usage | Less  |   More |
+
+
+
 #### Order Matters
 #### Idempotent Consumer Bahvior
 
@@ -101,9 +141,20 @@ Kafka Seek API
 
 [Byte Buffer Writer to fulifill Kafka Message](https://github.com/apache/kafka/blob/0.9.0/core/src/main/scala/kafka/message/Message.scala#L100-L131)
 
+
 ## Index Structure
 ## Fair Topic Partition Assignment
 ## Consumer Rebalance & Consumer Redesign
 
 # Appendix
 1. [The Pathologies of Big Data](http://queue.acm.org/detail.cfm?id=1563874)
+2. [TCP State/Transition Diagram](https://tangentsoft.net/wskfaq/articles/debugging-tcp.html)
+3. [TCP Window Scale](https://slaptijack.com/system-administration/what-is-tcp-window-scaling/)
+4. [TCP Man Page](http://man7.org/linux/man-pages/man7/tcp.7.html)
+
+```
+The maximum sizes for socket buffers declared via the SO_SNDBUF and
+       SO_RCVBUF mechanisms are limited by the values in the
+       /proc/sys/net/core/rmem_max and /proc/sys/net/core/wmem_max files.
+```
+5. [Kafka Compression Gzip vs Snappy ](https://nehanarkhede.com/2013/03/28/compression-in-kafka-gzip-or-snappy/)
