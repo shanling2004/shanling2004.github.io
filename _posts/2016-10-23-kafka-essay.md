@@ -81,7 +81,7 @@ net.ipv4.tcp_fin_timeout = 30net.ipv4.tcp_keepalive_time = 360net.ipv4.tcp_sac
 
 ### Topic Partition Number
 ### Producer & Consumer Settings
-#### Prodcuer Settings
+#### Producer Settings
 ```
 /** The producer will attempt to batch records together into fewer requests whenever multiple records are being sent **/
 batch.size=1048576
