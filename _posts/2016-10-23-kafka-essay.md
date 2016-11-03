@@ -81,6 +81,11 @@ net.ipv4.tcp_fin_timeout = 30net.ipv4.tcp_keepalive_time = 360net.ipv4.tcp_sac
 
 ### Topic Partition Number
 ### Producer & Consumer Settings
+总体思路如下：
+* 在SLA能接受的情况下，批量分发Kafka Event 以期较高的吞吐量
+* 相比于单批次的Kafka Batch Event数据量，尽量确保每个TCP round trip都能发送足够多的data，以保证用尽量少的TCP/socket 发送接收的round trip
+* 用两端的CPU Cycle做event payload压缩和解压缩 换取精简的event payload，以减少对network bandwidth和broker storage的压力和要求
+* 平衡Latency和data loss的需求，在大多数场景下，Kafka Partition Leader已经接收消息 确认之后 消息通常就不太会丢失 通过offline replica sync 异步地分发到其他follower节点上。 
 #### Producer Settings
 ```
 /** The producer will attempt to batch records together into fewer requests whenever multiple records are being sent **/
