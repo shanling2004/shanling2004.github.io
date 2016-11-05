@@ -5,8 +5,7 @@ description: "Summarize Apache Kafka Key Experience Items"
 category: apache-kafka 
 tags: ["apache-kafka"]
 ---
-{% include JB/setup %}**Draft**
-
+{% include JB/setup %}
 今年多少做了些Apache Kafka相关的项目，看了些源码和很多社区的分享( 主要是[linkedin] (https://engineering.linkedin.com/) 和 [confluent.io](http://www.confluent.io/blog/) ), 这里多少做个总结, 留给未来的自己回顾，朝花夕拾。
 
 **Note**: 本文大部分是基于Apache Kafka 0.8.2和0.9.0版本讨论的。
@@ -68,7 +67,7 @@ Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka
 ![Kafka Message Set]({{ site.JB.IMAGE_PATH }}/batch_process.png "Kafka Message Set")
 
 
-这章节最后，我想说 有得必有失，在追求某方面极致的过程中 必定在其他方面有所缺失 或者照顾不周。
+这章节最后，我想说 有得必有失，在追求某方面极致的过程中 必定在其他方面有所缺失和取舍。
 
 ##性能调优
 ### OS Layer
@@ -85,7 +84,7 @@ net.ipv4.tcp_fin_timeout = 30net.ipv4.tcp_keepalive_time = 360net.ipv4.tcp_sac
 * 在SLA能接受的情况下，批量分发Kafka Event 以期较高的吞吐量
 * 相比于单批次的Kafka Batch Event数据量，尽量确保每个TCP round trip都能发送足够多的data，以保证用尽量少的TCP/socket 发送接收的round trip
 * 用两端的CPU Cycle做event payload压缩和解压缩 换取精简的event payload，以减少对network bandwidth和broker storage的压力和要求
-* 平衡Latency和data loss的需求，在大多数场景下，Kafka Partition Leader已经接收消息 确认之后 消息通常就不太会丢失 通过offline replica sync 异步地分发到其他follower节点上。 
+* 平衡Low Latency和data replica to prevent data loss的需求，在大多数场景下，Kafka Partition Leader已经接收消息 确认之后 消息通常就不太会丢失 通过offline replica sync 异步地分发到其他follower节点上。 
 #### Producer Settings
 ```
 /** The producer will attempt to batch records together into fewer requests whenever multiple records are being sent **/
@@ -111,57 +110,37 @@ batch.size <= send.buffer.bytes <= net.core.wmem_max
 
 再不济，需要满足`batch.size <= N * send.buffer.bytes <= M * net.core.wmem_max`, 以满足数据对齐发送的效果, 珍惜每个TCP和socket发送的窗口。
 
-* 关于压缩策略，比较Snappy和Gzip优劣，一般场景下，从吞吐量和CPU资源消耗角度看，Snappy都优于Gzip，除非是特别敏感于传输数量大小，GZIP是更优秀的选择（因为GZIP压缩比更高），例如跨数据中心的传输。参看附录#5
+* 关于压缩策略，比较Snappy和Gzip优劣，一般场景下，从吞吐量和CPU资源消耗角度看，Snappy都优于Gzip，除非是特别敏感于传输数量大小，GZIP是更优秀的选择（因为GZIP压缩比更高），例如跨数据中心的传输。参看附录#4
 
 | Comparison Item      | Snappy           | Gzip  |
 | ------------- |:-------------:| :---------------:|
 | Compression Ratio | 2:1    |    2。8:1 |
 | Throughput Ratio | 2.5X   |    1X |
 | CPU Cycle Usage | Less  |   More |
+#### Consumer Settings
+```
+queued.max.message.chunks=10
+fetch.message.max.bytes=1048576
+socket.receive.buffer.bytes=1048576
+```
+![Kafka Message Set]({{ site.JB.IMAGE_PATH }}/kafka consumer.png "Kafka Message Set")
 
+* Note:
+[based on Fetch SIze，prepare fetch request to pull partition data](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L44)
+[Fetch Request's Partition Data append into blocking queue](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L74)
 
-
-#### Order Matters
-#### Idempotent Consumer Bahvior
-
-
-Kafka Seek API
-##Single & Batch Kafka Message Structure
-![Kafka Message Structure]({{ site.JB.IMAGE_PATH }}/kafka_message_format.png "Kafka Message Structure")
-
-| Message   Column      | Description           | Size  |
-| ------------- |:-------------:| :---------------:|
-| CRC32 CheckSum | 通过CRC32 校验码确认 接收的Payload内容和原先期待的是一致的，否则就fast fail with InvalidMessageException    |    4 Byte |
-| Magic | 用于判断消息格式版本号 （在0.9.0Kafkja版本中 暂时看并未完全使用判断）   |    1 Byte |
-| Attribue | 该字符可以作为随机的place holder使用, 目前用于表示标识压缩类型 （比如GZIP, SNAPPY, LZ4）   |    1 Byte |
-| Key Length |  表示Key的总长度  |    4 Byte |
-| Key Payload | Key本身的字符 (可选字符串)  |    K Byte |
-| Value Length |  表示Key的总长度  |    4 Byte |
-| Value Payload | Value本身的内容   |    V Byte |
-
-![Kafka Message Set]({{ site.JB.IMAGE_PATH }}/messageset.png "Kafka Message Set")
-
-
-**源码参看**
-
-[Comment for Kafka Message Structure](https://github.com/apache/kafka/blob/0.9.0/core/src/main/scala/kafka/message/Message.scala#L70-L82)
-
-[Byte Buffer Writer to fulifill Kafka Message](https://github.com/apache/kafka/blob/0.9.0/core/src/main/scala/kafka/message/Message.scala#L100-L131)
-
-
-## Index Structure
-## Fair Topic Partition Assignment
-## Consumer Rebalance & Consumer Redesign
+* 未完，下篇接着扯。
 
 # Appendix
 1. [The Pathologies of Big Data](http://queue.acm.org/detail.cfm?id=1563874)
 2. [TCP State/Transition Diagram](https://tangentsoft.net/wskfaq/articles/debugging-tcp.html)
 3. [TCP Window Scale](https://slaptijack.com/system-administration/what-is-tcp-window-scaling/)
-4. [TCP Man Page](http://man7.org/linux/man-pages/man7/tcp.7.html)
+4. [Kafka Compression Gzip vs Snappy ](https://nehanarkhede.com/2013/03/28/compression-in-kafka-gzip-or-snappy/)
+5. [Producer Performance Tuning For Apache Kafka](http://www.slideshare.net/JiangjieQin/producer-performance-tuning-for-apache-kafka-63147600) 
+6. [TCP Man Page](http://man7.org/linux/man-pages/man7/tcp.7.html)
 
 ```
 The maximum sizes for socket buffers declared via the SO_SNDBUF and
        SO_RCVBUF mechanisms are limited by the values in the
        /proc/sys/net/core/rmem_max and /proc/sys/net/core/wmem_max files.
 ```
-5. [Kafka Compression Gzip vs Snappy ](https://nehanarkhede.com/2013/03/28/compression-in-kafka-gzip-or-snappy/)
