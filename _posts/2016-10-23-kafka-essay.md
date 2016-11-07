@@ -1,12 +1,12 @@
 ---
 layout: post
-title: "Apache Kafka 三两事"
+title: "Apache Kafka 三两事 (上篇)"
 description: "Summarize Apache Kafka Key Experience Items"
 category: apache-kafka 
 tags: ["apache-kafka"]
 ---
 {% include JB/setup %}
-今年多少做了些Apache Kafka相关的项目，看了些源码和很多社区的分享( 主要是[linkedin] (https://engineering.linkedin.com/) 和 [confluent.io](http://www.confluent.io/blog/) ), 这里多少做个总结, 留给未来的自己回顾，朝花夕拾。
+今年多少做了些Apache Kafka相关的项目，看了些源码和很多社区的分享( 主要是[linkedin] (https://engineering.linkedin.com/) 和 [confluent.io](http://www.confluent.io/blog/) ), 这里多少做个总结, 留给未来的自己回顾，朝花夕拾。本文主要想探究一下从设计角度来看 Kafka高性能和高吞吐量的秘密，进而如何有针对性的tuning来达到峰值的吞吐量。
 
 **Note**: 本文大部分是基于Apache Kafka 0.9.0版本讨论的。操作系统内核是基于Linux Kenerl 2.6+ 版本。
 				
@@ -71,21 +71,23 @@ Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka
 
 ##性能调优
 ### OS Layer
-#### TCP kernel parameters optimization 
+#### TCP Optimization 
+TCP tuning主要思路是尽可能扩大滑动窗口的大小，能迅速到达窗口峰值，尽可能保留每个已经建立的TCP连接（毕竟TCP三次握手建立连接很费时））
 ```
 net.ipv4.tcp_fin_timeout = 30net.ipv4.tcp_keepalive_time = 360net.ipv4.tcp_sack = 1net.ipv4.tcp_dsack = 1net.ipv4.tcp_timestamps = 1net.ipv4.tcp_window_scaling = 1net.ipv4.tcp_tw_reuse = 1net.ipv4.tcp_tw_recycle = 1net.core.wmem_max = 8388608net.core.rmem_max = 8388608net.ipv4.tcp_rmem = 4096        87380   8388608net.ipv4.tcp_wmem = 4096        87380   8388608net.ipv4.ip_local_port_range = 1024 65000net.ipv4.tcp_max_tw_buckets = 5000net.core.netdev_max_backlog = 262144net.core.somaxconn = 262144
 ```
+* 以上参数值仅供参考
 #### Page Cache
 说实话 Page cache tuning 是Kafkatuning比较重要的部分 毕竟之前的阐述表明Kafka 设计是Page cache centric，银耳作为基础核心依赖的部分tuning 做到位的话 效果也是事半功倍的。
 ##### Disable Swappniess & disable force drop cache
 为了达到最后的cache 效果，我们不想利用磁盘SWAP分区来补充内存空间，最大限度利用物理内存空间。
-···
+```
 echo 0> /proc/sys/vm/swappiness
-···
+```
 另一方面，我们更不想出发强制的page cache 清空事件。类似事件发生，对刚publish进入page cache，还未通过PDflush到磁盘的，event来说意味着data loss，尤其是对replica还未完成的broker而言。
-···
+```
 echo 0 > /proc/sys/vm/drop_caches
-···
+```
 ##### Page Cache Settings
 ```
 vm.dirty_expire_centisecs
@@ -116,9 +118,51 @@ nr_dirty 61
 nr_writeback 0
 ```
 
-#### FD Number
-
 ### Topic Partition Number
+Kafka Partition 是Kafka最小的并发单位，更多的Partition意味着有更多的独立通道可以rang生产消费者两端传输消息。因此，Partition number很大程度上决定了Kafka de消息吞吐量。
+单Partition内部event是保证顺序的，跨parition间的event是不保证顺序。因而，如果你对某组event希望保持顺序地消费和发生，需要好好定义Event Key。
+#### Partition增加的副作用
+月满则亏，partition数量也不能无限制地扩大 追求无限的吞吐量。有哪些因素限制Partition number增长呢。
+* 更多的分区会提供更大吞吐量
+* 更多的分区需要打开更多的文件句柄
+* 过多分区可能会影响可用性
+* 更多分区会增加端到端延迟
+* 更多分区会要求客户端更多内存分配
+
+##### 维度划分
+所以，要如何规划Kafka集群，以下是我的心得。
+* Topic: 定义某组有业务含义的归类（例如，用户交易事件，用户登录事件，用户退出事件），mirrorMaker也可以轻松地根据topic名做cross colo replica。
+* Partition: 内部调整吞吐量的参数 不关联任何业务含义
+* Cluster：只有当单个集群 无法支撑更多topic partition traffic的时候，我们可以扩展独立的新集群来容纳新的业务含义的完整topic
+
+具体，请参看Appendix#10
+
+#### File Descriptor Number
+单个Topic Parition的commit log，会每个segment对应两个file descriptor，一个对应*.log原生event文件，另一个FD对应 *.index索引文件。
+因而，我们可以大致推导出单topic所需要的FD数量，如下:
+
+```
+FD_number_per_topic=
+Topic_number * Partition_number * segment_number * replica_ratio / broker_node_number
+```
+另一方面，`log.segment.bytes`单个segment的log最大byte数目和单topic parition的log byte总量都会影响open FD总量。
+
+* 控制FD 数量,可以通过三种方式: (1)`ulimit command` (2)`/etc/security/limits.conf` (3)`/proc/sys/fs/file-max`
+
+```
+shell:/x/home/zhiling# ulimit -Hn
+51200
+shell:/x/home/zhiling# ulimit -Sn
+51200
+
+shell:# cat  /etc/security/limits.conf|grep nofile
+***       soft    nofile          51200
+***       hard    nofile          51200
+
+shell:/x/home/zhiling# cat /proc/sys/fs/file-max
+262144
+```
+
 ### Producer & Consumer Settings
 总体思路如下：
 * 在SLA能接受的情况下，批量分发Kafka Event 以期较高的吞吐量
@@ -154,7 +198,7 @@ batch.size <= send.buffer.bytes <= net.core.wmem_max
 
 | Comparison Item      | Snappy           | Gzip  |
 | ------------- |:-------------:| :---------------:|
-| Compression Ratio | 2:1    |    2。8:1 |
+| Compression Ratio | 2:1    |    2.8:1 |
 | Throughput Ratio | 2.5X   |    1X |
 | CPU Cycle Usage | Less  |   More |
 #### Consumer Settings
@@ -166,7 +210,7 @@ socket.receive.buffer.bytes=1048576
 ![Kafka Message Set]({{ site.JB.IMAGE_PATH }}/kafka consumer.png "Kafka Message Set")
 
 * Note:
-[based on Fetch SIze，prepare fetch request to pull partition data](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L44)
+[based on Fetch Size，prepare fetch request to pull partition data](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L44)
 [Fetch Request's Partition Data append into blocking queue](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L74)
 
 * 未完，下篇接着扯。最后 我想说在文章最后 才发现Kafka Committer (Jay Kreps, 也是最近比较红的一篇文章"The Log: What every software engineer should know about real-time data's unifying abstraction"作者)，他列举的三大理由（参看Appendix#8） 本文基本覆盖到了当然 阐述的深度和深入浅出肯定不让大神。
@@ -181,3 +225,4 @@ socket.receive.buffer.bytes=1048576
 7. [Linux Storage Stack Daigram](https://upload.wikimedia.org/wikipedia/commons/3/30/IO_stack_of_the_Linux_kernel.svg)
 8. [Why kafka Performance rocks](https://www.quora.com/Kafka-writes-every-message-to-broker-disk-Still-performance-wise-it-is-better-than-some-of-the-in-memory-message-storing-message-queues-Why-is-that)
 9. [The Log: What every software engineer should know about real-time data's unifying abstraction](https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying)
+10. [翻译:在Kafka集群内, 如何权衡Topics／Paritions数量](http://shanling2004.com/post/kafka-topicsparitions.html)
