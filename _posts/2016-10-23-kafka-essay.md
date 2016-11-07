@@ -8,7 +8,7 @@ tags: ["apache-kafka"]
 {% include JB/setup %}
 今年多少做了些Apache Kafka相关的项目，看了些源码和很多社区的分享( 主要是[linkedin] (https://engineering.linkedin.com/) 和 [confluent.io](http://www.confluent.io/blog/) ), 这里多少做个总结, 留给未来的自己回顾，朝花夕拾。
 
-**Note**: 本文大部分是基于Apache Kafka 0.8.2和0.9.0版本讨论的。
+**Note**: 本文大部分是基于Apache Kafka 0.9.0版本讨论的。操作系统内核是基于Linux Kenerl 2.6+ 版本。
 				
 ##高性能
 首先，还是想老生常谈 说一下自己对于Kafka高性能表现的理解。
@@ -39,7 +39,7 @@ High Performance和High Throughput是很多分布式系统都追求和标榜的�
 
 ![Kafka Broker Memory Consumption]({{ site.JB.IMAGE_PATH }}/memory_consumption.png "Kafka Broker Memory Consumption")
 
-###WAL
+###WAL & Sequence IO
 Write-Ahead log flush主要还是想充分利用性能友好的磁盘顺序写。为了最大化提升读写性能，Kafka 追加event 在[log segment](https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/log/LogSegment.scala#L97) 和 [index](https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/log/LogSegment.scala#L105) byte buffer中 定期flush到page cache，进而刷到磁盘。
 
 引用之前经典的 关于随机，顺序磁盘访问和内存访问的性能评测。需要强调的是磁盘随机读相比于磁盘顺序读慢了将近150，000倍，甚至于内存随机读性能也劣于磁盘顺序。
@@ -76,6 +76,46 @@ Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka
 net.ipv4.tcp_fin_timeout = 30net.ipv4.tcp_keepalive_time = 360net.ipv4.tcp_sack = 1net.ipv4.tcp_dsack = 1net.ipv4.tcp_timestamps = 1net.ipv4.tcp_window_scaling = 1net.ipv4.tcp_tw_reuse = 1net.ipv4.tcp_tw_recycle = 1net.core.wmem_max = 8388608net.core.rmem_max = 8388608net.ipv4.tcp_rmem = 4096        87380   8388608net.ipv4.tcp_wmem = 4096        87380   8388608net.ipv4.ip_local_port_range = 1024 65000net.ipv4.tcp_max_tw_buckets = 5000net.core.netdev_max_backlog = 262144net.core.somaxconn = 262144
 ```
 #### Page Cache
+说实话 Page cache tuning 是Kafkatuning比较重要的部分 毕竟之前的阐述表明Kafka 设计是Page cache centric，银耳作为基础核心依赖的部分tuning 做到位的话 效果也是事半功倍的。
+##### Disable Swappniess & disable force drop cache
+为了达到最后的cache 效果，我们不想利用磁盘SWAP分区来补充内存空间，最大限度利用物理内存空间。
+···
+echo 0> /proc/sys/vm/swappiness
+···
+另一方面，我们更不想出发强制的page cache 清空事件。类似事件发生，对刚publish进入page cache，还未通过PDflush到磁盘的，event来说意味着data loss，尤其是对replica还未完成的broker而言。
+···
+echo 0 > /proc/sys/vm/drop_caches
+···
+##### Page Cache Settings
+```
+vm.dirty_expire_centisecs
+vm.dirty_writeback_centisecs 
+vm.dirty_ratio
+vm.dirty_background_ratio
+vm.nr_pdflush_threads
+```
+vm.dirty_background_ratio 是内存可以填充“脏数据”的百分比。这些“脏数据”在稍后是会写入磁盘的，pdflush/flush/kdmflush这些后台进程会稍后清理脏数据。
+
+vm.dirty_ratio 是绝对的脏数据限制，内存里的脏数据百分比不能超过这个值。如果脏数据超过这个数量，新的IO请求将会被阻挡，直到脏数据被写进磁盘。这是造成IO卡顿的重要原因，但这也是保证内存中不会存在过量脏数据的保护机制。
+
+vm.dirty_expire_centisecs 指定脏数据能存活的时间。在这里它的值是30秒。当 pdflush/flush/kdmflush 进行起来时，它会检查是否有数据超过这个时限，如果有则会把它异步地写到磁盘中。毕竟数据在内存里待太久也会有丢失风险。单位是厘秒(1/100 second)。
+
+vm.dirty_writeback_centisecs 指定多长时间 pdflush/flush/kdmflush 这些进程会起来一次。单位是厘秒(1/100 second)。
+nr_pdflush_threads 指定多少线程帮助并发的flush page cache脏数据到磁盘。
+
+* 建议
+
+  * vm.dirty_background_ratio < vm.dirty_ratio, 在内存空间充足的场景下，可以适当调大比例，防止IO block
+  * vm.dirty_writeback_centisecs flush频度 调太大容易导致过多dirty page cache，太频繁，容易导致不必要的小数据量读写IO，要视情况而定，据说1:6 (dirty_expire_centisecs  :    dirty_writeback_centisecs )的比例比较好，但我并未测试证明过。
+  * nr_pdflush_threads根据实际情况可以适当调大以满足快速flush需求
+  * 关于如何检测in-running dirty page和当前wirte back数量，可以简单利用以下命令
+
+```
+shell:/proc/sys/vm# cat /proc/vmstat | egrep "dirty|writeback"
+nr_dirty 61
+nr_writeback 0
+```
+
 #### FD Number
 
 ### Topic Partition Number
@@ -129,7 +169,7 @@ socket.receive.buffer.bytes=1048576
 [based on Fetch SIze，prepare fetch request to pull partition data](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L44)
 [Fetch Request's Partition Data append into blocking queue](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L74)
 
-* 未完，下篇接着扯。
+* 未完，下篇接着扯。最后 我想说在文章最后 才发现Kafka Committer (Jay Kreps, 也是最近比较红的一篇文章"The Log: What every software engineer should know about real-time data's unifying abstraction"作者)，他列举的三大理由（参看Appendix#8） 本文基本覆盖到了当然 阐述的深度和深入浅出肯定不让大神。
 
 # Appendix
 1. [The Pathologies of Big Data](http://queue.acm.org/detail.cfm?id=1563874)
@@ -138,9 +178,6 @@ socket.receive.buffer.bytes=1048576
 4. [Kafka Compression Gzip vs Snappy ](https://nehanarkhede.com/2013/03/28/compression-in-kafka-gzip-or-snappy/)
 5. [Producer Performance Tuning For Apache Kafka](http://www.slideshare.net/JiangjieQin/producer-performance-tuning-for-apache-kafka-63147600) 
 6. [TCP Man Page](http://man7.org/linux/man-pages/man7/tcp.7.html)
-
-```
-The maximum sizes for socket buffers declared via the SO_SNDBUF and
-       SO_RCVBUF mechanisms are limited by the values in the
-       /proc/sys/net/core/rmem_max and /proc/sys/net/core/wmem_max files.
-```
+7. [Linux Storage Stack Daigram](https://upload.wikimedia.org/wikipedia/commons/3/30/IO_stack_of_the_Linux_kernel.svg)
+8. [Why kafka Performance rocks](https://www.quora.com/Kafka-writes-every-message-to-broker-disk-Still-performance-wise-it-is-better-than-some-of-the-in-memory-message-storing-message-queues-Why-is-that)
+9. [The Log: What every software engineer should know about real-time data's unifying abstraction](https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying)
