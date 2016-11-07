@@ -118,25 +118,6 @@ nr_dirty 61
 nr_writeback 0
 ```
 
-### Topic Partition Number
-Kafka Partition 是Kafka最小的并发单位，更多的Partition意味着有更多的独立通道可以rang生产消费者两端传输消息。因此，Partition number很大程度上决定了Kafka de消息吞吐量。
-单Partition内部event是保证顺序的，跨parition间的event是不保证顺序。因而，如果你对某组event希望保持顺序地消费和发生，需要好好定义Event Key。
-#### Partition增加的副作用
-月满则亏，partition数量也不能无限制地扩大 追求无限的吞吐量。有哪些因素限制Partition number增长呢。
-* 更多的分区会提供更大吞吐量
-* 更多的分区需要打开更多的文件句柄
-* 过多分区可能会影响可用性
-* 更多分区会增加端到端延迟
-* 更多分区会要求客户端更多内存分配
-
-##### 维度划分
-所以，要如何规划Kafka集群，以下是我的心得。
-* Topic: 定义某组有业务含义的归类（例如，用户交易事件，用户登录事件，用户退出事件），mirrorMaker也可以轻松地根据topic名做cross colo replica。
-* Partition: 内部调整吞吐量的参数 不关联任何业务含义
-* Cluster：只有当单个集群 无法支撑更多topic partition traffic的时候，我们可以扩展独立的新集群来容纳新的业务含义的完整topic
-
-具体，请参看Appendix#10
-
 #### File Descriptor Number
 单个Topic Parition的commit log，会每个segment对应两个file descriptor，一个对应*.log原生event文件，另一个FD对应 *.index索引文件。
 因而，我们可以大致推导出单topic所需要的FD数量，如下:
@@ -162,14 +143,33 @@ shell:# cat  /etc/security/limits.conf|grep nofile
 shell:/x/home/zhiling# cat /proc/sys/fs/file-max
 262144
 ```
+### Kafka App Layer
+##### Topic Partition Number
+Kafka Partition 是Kafka最小的并发单位，更多的Partition意味着有更多的独立通道可以rang生产消费者两端传输消息。因此，Partition number很大程度上决定了Kafka de消息吞吐量。
+单Partition内部event是保证顺序的，跨parition间的event是不保证顺序。因而，如果你对某组event希望保持顺序地消费和发生，需要好好定义Event Key。
+##### Partition增加的副作用
+月满则亏，partition数量也不能无限制地扩大 追求无限的吞吐量。有哪些因素限制Partition number增长呢。
+* 更多的分区会提供更大吞吐量
+* 更多的分区需要打开更多的文件句柄
+* 过多分区可能会影响可用性
+* 更多分区会增加端到端延迟
+* 更多分区会要求客户端更多内存分配
 
-### Producer & Consumer Settings
+###### 维度划分
+所以，要如何规划Kafka集群，以下是我的心得。
+* Topic: 定义某组有业务含义的归类（例如，用户交易事件，用户登录事件，用户退出事件），mirrorMaker也可以轻松地根据topic名做cross colo replica。
+* Partition: 内部调整吞吐量的参数 不关联任何业务含义
+* Cluster：只有当单个集群 无法支撑更多topic partition traffic的时候，我们可以扩展独立的新集群来容纳新的业务含义的完整topic
+
+具体，请参看Appendix#10
+
+#### Producer & Consumer Settings
 总体思路如下：
 * 在SLA能接受的情况下，批量分发Kafka Event 以期较高的吞吐量
 * 相比于单批次的Kafka Batch Event数据量，尽量确保每个TCP round trip都能发送足够多的data，以保证用尽量少的TCP/socket 发送接收的round trip
 * 用两端的CPU Cycle做event payload压缩和解压缩 换取精简的event payload，以减少对network bandwidth和broker storage的压力和要求
 * 平衡Low Latency和data replica to prevent data loss的需求，在大多数场景下，Kafka Partition Leader已经接收消息 确认之后 消息通常就不太会丢失 通过offline replica sync 异步地分发到其他follower节点上。 
-#### Producer Settings
+##### Producer Settings
 ```
 /** The producer will attempt to batch records together into fewer requests whenever multiple records are being sent **/
 batch.size=1048576
@@ -201,7 +201,7 @@ batch.size <= send.buffer.bytes <= net.core.wmem_max
 | Compression Ratio | 2:1    |    2.8:1 |
 | Throughput Ratio | 2.5X   |    1X |
 | CPU Cycle Usage | Less  |   More |
-#### Consumer Settings
+##### Consumer Settings
 ```
 queued.max.message.chunks=10
 fetch.message.max.bytes=1048576
@@ -213,7 +213,7 @@ socket.receive.buffer.bytes=1048576
 [based on Fetch Size，prepare fetch request to pull partition data](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L44)
 [Fetch Request's Partition Data append into blocking queue](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L74)
 
-* 未完，下篇接着扯。最后 我想说在文章最后 才发现Kafka Committer (Jay Kreps, 也是最近比较红的一篇文章"The Log: What every software engineer should know about real-time data's unifying abstraction"作者)，他列举的三大理由（参看Appendix#8） 本文基本覆盖到了当然 阐述的深度和深入浅出肯定不让大神。
+* 未完，下篇接着扯。最后 我想说在文章最后 才发现Kafka Committer (Jay Kreps, 也是最近比较红的一篇文章"The Log: What every software engineer should know about real-time data's unifying abstraction"作者)，他列举的三大理由（参看Appendix#8） 本文基本都有所涉及 当然，阐述的深度和深入浅出肯定和大神不是一个级别的。
 
 # Appendix
 1. [The Pathologies of Big Data](http://queue.acm.org/detail.cfm?id=1563874)
