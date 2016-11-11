@@ -5,7 +5,12 @@ description: "Summarize Apache Kafka Key Experience Items"
 category: apache-kafka 
 tags: ["apache-kafka"]
 ---
-{% include JB/setup %}
+{% include JB/setup %}#Release Notes
+| Version      | Comment       |
+| ------------- |:---------------:|
+| 1 | Init Commit |
+| 2 | 1. 删除 disable drop cache对data loss的影响 章节 感谢迪八哥和XuJian的指正。 2. 增加 Multi data Volume Support章节 3.增加Appendix#11  |
+
 今年多少做了些Apache Kafka相关的项目，看了些源码和很多社区的分享( 主要是[linkedin] (https://engineering.linkedin.com/) 和 [confluent.io](http://www.confluent.io/blog/) ), 这里多少做个总结, 留给未来的自己回顾，朝花夕拾。本文主要想探究一下从设计角度来看 Kafka高性能和高吞吐量的秘密，进而如何有针对性的tuning来达到峰值的吞吐量。
 
 **Note**: 本文大部分是基于Apache Kafka 0.9.0版本讨论的。操作系统内核是基于Linux Kenerl 2.6+ 版本。
@@ -45,6 +50,7 @@ Write-Ahead log flush主要还是想充分利用性能友好的磁盘顺序写�
 引用之前经典的 关于随机，顺序磁盘访问和内存访问的性能评测。需要强调的是磁盘随机读相比于磁盘顺序读慢了将近150，000倍，甚至于内存随机读性能也劣于磁盘顺序。
 
 ![Comparing Random and Sequential Access in DIsk and Memory]({{ site.JB.IMAGE_PATH }}/jacobs3.jpg "Comparing Random and Sequential Access in DIsk and Memory")
+原文链接参看Appendix#11
 
 但是 有一点我不太明白的是为什么顺序读 SAS磁盘 ( 53.2M values/sec ) 会优于SSD ( 42.2M values/sec )。
 
@@ -79,15 +85,12 @@ net.ipv4.tcp_fin_timeout = 30net.ipv4.tcp_keepalive_time = 360net.ipv4.tcp_sac
 * 以上参数值仅供参考
 #### Page Cache
 说实话 Page cache tuning 是Kafkatuning比较重要的部分 毕竟之前的阐述表明Kafka 设计是Page cache centric，银耳作为基础核心依赖的部分tuning 做到位的话 效果也是事半功倍的。
-##### Disable Swappniess & disable force drop cache
+##### Disable Swappniess
 为了达到最后的cache 效果，我们不想利用磁盘SWAP分区来补充内存空间，最大限度利用物理内存空间。
 ```
 echo 0> /proc/sys/vm/swappiness
 ```
-另一方面，我们更不想出发强制的page cache 清空事件。类似事件发生，对刚publish进入page cache，还未通过PDflush到磁盘的，event来说意味着data loss，尤其是对replica还未完成的broker而言。
-```
-echo 0 > /proc/sys/vm/drop_caches
-```
+
 ##### Page Cache Settings
 ```
 vm.dirty_expire_centisecs
@@ -106,7 +109,6 @@ vm.dirty_writeback_centisecs 指定多长时间 pdflush/flush/kdmflush 这些进
 nr_pdflush_threads 指定多少线程帮助并发的flush page cache脏数据到磁盘。
 
 * 建议
-
   * vm.dirty_background_ratio < vm.dirty_ratio, 在内存空间充足的场景下，可以适当调大比例，防止IO block
   * vm.dirty_writeback_centisecs flush频度 调太大容易导致过多dirty page cache，太频繁，容易导致不必要的小数据量读写IO，要视情况而定，据说1:6 (dirty_expire_centisecs  :    dirty_writeback_centisecs )的比例比较好，但我并未测试证明过。
   * nr_pdflush_threads根据实际情况可以适当调大以满足快速flush需求
@@ -154,14 +156,39 @@ Kafka Partition 是Kafka最小的并发单位，更多的Partition意味着有�
 * 过多分区可能会影响可用性
 * 更多分区会增加端到端延迟
 * 更多分区会要求客户端更多内存分配
+具体，请参看Appendix#10
 
 ###### 维度划分
-所以，要如何规划Kafka集群，以下是我的心得。
+之所以，会突兀地提出这个话题，主要之前做项目时候有个tradeoff和决定，是在保持较高的吞吐量的情况下，关于如何平衡业务关联的Topic Partition和Kafka cluster运维。
+举个例子，我们有*300* Topic 关于各种不同的业务含义事件，为了保持一定并发度，假设我们给每个Topic分配*20*个Partition。整体，单个Cluster就需要支持6000 Topic+Partition。
+随着业务需求的增长，持续会有更多的Topic加入，过多的Topic+Partition就会引发之前提到的副作用，对整体集群的维护增加更多的负担，ATB也会受影响。
+解决方案有两个 （1）[ Scale on Separate Kafka Cluster ] 引入新Kafka集群，在Cluster层面去扩展 （2）[ Virtual Topic Share Physical Topic ] 把多个业务Topic 整合成单个大的Topic，例如 和用户相关的Virtual Topic Event可以可以生产消费在同一个物理的Topic上。
+
+| Comparison Item      | Pros           | Cons  |
+| ------------- |:-------------:| :---------------:|
+| Scale on Separate Kafka Cluster | 细粒度，对于consumer和MirrorMaker相对友好 （可以有个相应的Topic Pattern归类一组有类似业务含义的Topic Group） | 可能会有更多硬件投入，需要有smart consumer & publisher 封装不同Cluster之间的差异，能自动映射Topic -> Cluster 关系 |
+| Virtual Topic Share Physical Topic  |    共用大Partition数量的Topic，为每个Virtual Topic增加共用的并行度 |    粗粒度 很难拆分 对于consumer而言，如果某个consumer只想，或者MirrorMaker想对每个不同的Virtual Topic做各种不同的Replica 策略的话 就只能filter其他Virtual Topic的event了 |
+
+所以，要如何规划Kafka集群，以下是我的理解。
+大多数场景 我推荐方案1[ Scale on Separate Kafka Cluster ] 。
 * Topic: 定义某组有业务含义的归类（例如，用户交易事件，用户登录事件，用户退出事件），mirrorMaker也可以轻松地根据topic名做cross colo replica。
 * Partition: 内部调整吞吐量的参数 不关联任何业务含义
-* Cluster：只有当单个集群 无法支撑更多topic partition traffic的时候，我们可以扩展独立的新集群来容纳新的业务含义的完整topic
+* Cluster：只有当单个集群 无法支撑更多topic partition traffic的时候，我们可以扩展独立的新集群来容纳新的业务含义的完整topic。
 
-具体，请参看Appendix#10
+##### Multi Disk Volume Support
+最坏情况下，如果Page Cache一直miss match，不得不从commit log的磁盘上读取event。在Kafka应用层面，可选优化方式是为commit log目录指定多个磁盘卷。每个磁盘卷可以挂载各自独立的磁盘，因而即使是机械磁盘，他们之间的磁道寻址也是相互独立 可并行执行的。
+例如，如下配置绑定三个目录
+```
+logs.dir=/x/kafka/data01/kafka-app-logs,/x/kafka/data02/kafka-app-logs,/x/kafka/data03/kafka-app-logs
+```
+那么 有个问题是到底Kafka内部怎么决定每个Partition commit和index log放在哪个folder呢？可以自定义配置吗？
+答案是：每次都挑选Parititon数量最少的目录作为下一个创建新Partition的目录，暂时无法定制化。
+
+个人觉得这个并不完全准确，因为每个Partition的event数量会有所不同，对应的segment数量就不同，每个segment才会最终对应物理的commit log和index log文件。
+
+[查找下一个Log Dir的源码逻辑](https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/log/LogManager.scala#L399-L417)
+
+这里不涉及存储内部优化 [E.g. 磁盘介质选择（SSD vs SATA）,或者RAID阵列优化或者分布式存储系统)
 
 #### Producer & Consumer Settings
 总体思路如下：
@@ -226,3 +253,5 @@ socket.receive.buffer.bytes=1048576
 8. [Why kafka Performance rocks](https://www.quora.com/Kafka-writes-every-message-to-broker-disk-Still-performance-wise-it-is-better-than-some-of-the-in-memory-message-storing-message-queues-Why-is-that)
 9. [The Log: What every software engineer should know about real-time data's unifying abstraction](https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying)
 10. [翻译:在Kafka集群内, 如何权衡Topics／Paritions数量](http://shanling2004.com/post/kafka-topicsparitions.html)
+11. [随机和顺序访问 磁盘和内存的比较](http://queue.acm.org/detail.cfm?id=1563874)
+
