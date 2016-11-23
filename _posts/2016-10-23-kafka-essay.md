@@ -5,12 +5,14 @@ description: "Summarize Apache Kafka Key Experience Items"
 category: apache-kafka 
 tags: ["apache-kafka"]
 ---
-{% include JB/setup %}#Release Notes
+{% include JB/setup %}
+
+#Release Notes
 | Version      | Comment       |
 | ------------- |:---------------:|
 | 1 | Init Commit |
 | 2 | 1. 删除 disable drop cache对data loss的影响 章节 感谢迪八哥和XuJian的指正。 2. 增加 Multi data Volume Support章节 3.增加Appendix#11  |
-
+
 今年多少做了些Apache Kafka相关的项目，看了些源码和很多社区的分享( 主要是[linkedin] (https://engineering.linkedin.com/) 和 [confluent.io](http://www.confluent.io/blog/) ), 这里多少做个总结, 留给未来的自己回顾，朝花夕拾。本文主要想探究一下从设计角度来看 Kafka高性能和高吞吐量的秘密，进而如何有针对性的tuning来达到峰值的吞吐量。
 
 **Note**: 本文大部分是基于Apache Kafka 0.9.0版本讨论的。操作系统内核是基于Linux Kenerl 2.6+ 版本。
@@ -80,7 +82,22 @@ Kafka broker利用[ FileChannel#transferTo API ](https://github.com/apache/kafka
 #### TCP Optimization 
 TCP tuning主要思路是尽可能扩大滑动窗口的大小，能迅速到达窗口峰值，尽可能保留每个已经建立的TCP连接（毕竟TCP三次握手建立连接很费时））
 ```
-net.ipv4.tcp_fin_timeout = 30net.ipv4.tcp_keepalive_time = 360net.ipv4.tcp_sack = 1net.ipv4.tcp_dsack = 1net.ipv4.tcp_timestamps = 1net.ipv4.tcp_window_scaling = 1net.ipv4.tcp_tw_reuse = 1net.ipv4.tcp_tw_recycle = 1net.core.wmem_max = 8388608net.core.rmem_max = 8388608net.ipv4.tcp_rmem = 4096        87380   8388608net.ipv4.tcp_wmem = 4096        87380   8388608net.ipv4.ip_local_port_range = 1024 65000net.ipv4.tcp_max_tw_buckets = 5000net.core.netdev_max_backlog = 262144net.core.somaxconn = 262144
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_keepalive_time = 360
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_dsack = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_tw_recycle = 1
+net.core.wmem_max = 8388608
+net.core.rmem_max = 8388608
+net.ipv4.tcp_rmem = 4096        87380   8388608
+net.ipv4.tcp_wmem = 4096        87380   8388608
+net.ipv4.ip_local_port_range = 1024 65000
+net.ipv4.tcp_max_tw_buckets = 5000
+net.core.netdev_max_backlog = 262144
+net.core.somaxconn = 262144
 ```
 * 以上参数值仅供参考
 #### Page Cache
@@ -147,7 +164,7 @@ shell:/x/home/zhiling# cat /proc/sys/fs/file-max
 ```
 ### Kafka App Layer
 ##### Topic Partition Number
-Kafka Partition 是Kafka最小的并发单位，更多的Partition意味着有更多的独立通道可以rang生产消费者两端传输消息。因此，Partition number很大程度上决定了Kafka de消息吞吐量。
+Kafka Partition 是Kafka最小的并发单位，更多的Partition意味着有更多的独立通道可以rang生产消费者两端传输消息。因此，Partition number很大程度上决定了Kafka 的消息吞吐量。
 单Partition内部event是保证顺序的，跨parition间的event是不保证顺序。因而，如果你对某组event希望保持顺序地消费和发生，需要好好定义Event Key。
 ##### Partition增加的副作用
 月满则亏，partition数量也不能无限制地扩大 追求无限的吞吐量。有哪些因素限制Partition number增长呢。
