@@ -71,7 +71,7 @@ a:hover, a:active { outline: none; }
 
 /*  Main  */
 #wrap {
-  width: 1200px;
+  width: 1100px;
   margin: 20px auto;
 }
 
@@ -720,7 +720,7 @@ pre code {
 }
 
 /*  Responsive UI  */
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
   #wrap { width: 100%; }
   #sidebar { display: none; }
   #main { background: none; }
