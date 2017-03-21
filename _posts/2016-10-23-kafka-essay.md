@@ -236,6 +236,29 @@ socket.receive.buffer.bytes=1048576
 ```
 ![Kafka Message Set]({{ site.JB.IMAGE_PATH }}/kafka consumer.png "Kafka Message Set")
 
+##Single & Batch Kafka Message Structure
+![Kafka Message Structure]({{ site.JB.IMAGE_PATH }}/kafka_message_format.png "Kafka Message Structure")
+
+| Message   Column      | Description           | Size  |
+| ------------- |:-------------:| :---------------:|
+| CRC32 CheckSum | 通过CRC32 校验码确认 接收的Payload内容和原先期待的是一致的，否则就fast fail with InvalidMessageException    |    4 Byte |
+| Magic | 用于判断消息格式版本号 （在0.9.0Kafkja版本中 暂时看并未完全使用判断）   |    1 Byte |
+| Attribue | 该字符可以作为随机的place holder使用, 目前用于表示标识压缩类型 （比如GZIP, SNAPPY, LZ4）   |    1 Byte |
+| Key Length |  表示Key的总长度  |    4 Byte |
+| Key Payload | Key本身的字符 (可选字符串)  |    K Byte |
+| Value Length |  表示Key的总长度  |    4 Byte |
+| Value Payload | Value本身的内容   |    V Byte |
+
+![Kafka Message Set]({{ site.JB.IMAGE_PATH }}/messageset.png "Kafka Message Set")
+
+
+**源码参看**
+
+[Comment for Kafka Message Structure](https://github.com/apache/kafka/blob/0.9.0/core/src/main/scala/kafka/message/Message.scala#L70-L82)
+
+[Byte Buffer Writer to fulifill Kafka Message](https://github.com/apache/kafka/blob/0.9.0/core/src/main/scala/kafka/message/Message.scala#L100-L131)
+
+
 * Note:
 [based on Fetch Size，prepare fetch request to pull partition data](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L44)
 [Fetch Request's Partition Data append into blocking queue](https://github.com/apache/kafka/blob/0.9.0.0/core/src/main/scala/kafka/consumer/ConsumerFetcherThread.scala#L74)
