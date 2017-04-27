@@ -123,7 +123,8 @@ Round Robin  策略分配结果
 ##Ending
 关于Topic Partition Assignment策略优化，社区还是有很多in-progress的讨论，具体可以参看 [Appendix3-7]。这里只是抛砖引玉，并未充分展开。
 最近 很遗憾没有太多机会去参与Kafka的相关实践。 以后 有机会可以在写以下内容：
-* 关于Kafka监控 
+* Kafka监控 
+* Kafka Consumer Client如何设计
 * 改进 它如何处理 heartbeat request和data plane request隔离性
 * 多少Topic Partition 对应多少连接数的推算
 * Kafka面试问题
