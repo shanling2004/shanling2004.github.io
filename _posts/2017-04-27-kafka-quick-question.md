@@ -18,7 +18,7 @@ tags: ["apache-kafka"]
 * What’s Kafka 0.8 client partition assignment strategy: Range & Radom? Pros & cons. Why they introduce centralized co-ordinator in 0.9? Is 0.8 partition assignment fair ? How to ensure real fair assignment?
 * Any benefit or drawback for zookeeper cluster in Kafka cluster?
 * Why we need kafka stream library?
-* Could you illustrate most of [Kafka COnfiguration](http://kafka.apache.org/documentation.html#configuration) 's frequent usage?
+* Could you illustrate most of [Kafka Configuration](http://kafka.apache.org/documentation.html#configuration) 's frequent usage?
 * How we can guarantee exactly-once pub-sub in kafka wit or without External offset record system. Any benefit when we adopt bloom filter/bit map algorithm?
 * What’s the meaning partition? How to balance topic + partition number when designing use case in. 
 * What’s ISR? How to coordinate ISR group? Why not use raft algorithm?
