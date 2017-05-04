@@ -143,3 +143,5 @@ JB :
   page :
     theme : 
       name : twitter
+
+theme: jekyll-theme-time-machine
