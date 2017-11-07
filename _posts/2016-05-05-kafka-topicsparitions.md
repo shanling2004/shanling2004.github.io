@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "在Kafka集群内, 如何权衡Topics／Paritions数量"
+title: "How To Choose The Number of Topics & Partitions in A Kafka Cluster"
 keywords: ["kafka","partition"]
 description: "How to Determine Kafka Topic/Partition Number"
 category: "apache-kafka"
