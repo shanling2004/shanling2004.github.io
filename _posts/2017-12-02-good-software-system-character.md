@@ -35,7 +35,7 @@ tags: ["technical-thinking"]
 
 # 友好性
 
-![Good System Outline]({{ site.JB.IMAGE_PATH }}/good_system/good_system_outline.png "Good System Outline")
+![Good System Outline]({{ site.JB.IMAGE_PATH }}/good_system_outline.png "Good System Outline")
 想要把一件事情做好 最终就要理顺生产关系 升级产生力  优化生产方式。
 
 ## 理解问题集
